@@ -1,5 +1,8 @@
 (cl:in-package #:invistra)
 
+(defvar *control-char* #\~)
+(defvar *control-char-downcase* '(#\x #\s))
+
 ;;; Split a control string into its components.  Each component is
 ;;; either a string to be printed as it is, or a directive.  The list
 ;;; of components will never contain two consecutive strings.
@@ -7,7 +10,7 @@
   (loop with start = 0
         with end = (length control-string)
         while (< start end)
-        collect (let ((tilde-position (position #\~ control-string :start start)))
+        collect (let ((tilde-position (position *control-char* control-string :start start)))
                   (cond ((null tilde-position)
                          ;; No tilde was found.  The rest of the control string
                          ;; is just a string to be printed.
@@ -37,7 +40,10 @@
                                     :start tilde-position
                                     :suffix-start suffix-start
                                     :end end-of-directive-position
-                                    :directive-character (char-upcase directive-character)
+                                    :directive-character
+                                    (if (member directive-character *control-char-downcase*)
+                                        (char-downcase directive-character)
+                                        (char-upcase directive-character))
                                     :parameters parameters
                                     :colon-p colon-p
                                     :at-sign-p at-sign-p)

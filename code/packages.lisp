@@ -13,6 +13,7 @@
            #:compile-item
            #:pop-argument
            #:define-interface
+           #:define-elisp-interface
            #:directive
            #:format
            #:format-compiler-macro
@@ -20,4 +21,6 @@
            #:interpret-item
            #:parameter-specifications
            #:parse-directive-suffix
-           #:specialize-directive))
+           #:specialize-directive
+           #:*control-char*
+           #:*control-char-downcase*))

@@ -9,7 +9,7 @@
 
 (defmethod parameter-specifications (client (directive base-radix-directive))
   (declare (ignore client))
-  '((:name mincol
+  `((:name mincol
      :type integer
      :default 0)
     (:name padchar
@@ -20,9 +20,12 @@
      :default #\,)
     (:name comma-interval
      :type integer
-     :default 3)))
+     :default 3)
+    (:name print-case
+     :type keyword
+     :default ,(print-case directive))))
 
-(defun print-radix-arg (client colon-p at-sign-p radix mincol padchar commachar comma-interval)
+(defun print-radix-arg (client colon-p at-sign-p radix mincol padchar commachar comma-interval print-case)
   (let ((argument (pop-argument)))
     (if (not (integerp argument))
         (let ((*print-base* radix)
@@ -53,7 +56,7 @@
           ;; Print the string in reverse order
           (loop for index downfrom (1- (length string)) to 0
                 for c across string
-                do (write-char c *destination*)
+                do (write-char (if (eq print-case :upcase) (char-upcase c) (char-downcase c)) *destination*)
                 do (when (and colon-p
                               (plusp index)
                               (zerop (mod index comma-interval)))
@@ -403,17 +406,34 @@
 ;;;
 ;;; 22.3.2.5 ~x Hexadecimal.
 
-(defclass hexadecimal-radix-directive (base-radix-directive)
+(defclass hexadecimal-radix-directive-lower (base-radix-directive)
+  ())
+
+(defmethod specialize-directive
+    ((client t) (char (eql #\x)) directive (end-directive t))
+  (change-class directive 'hexadecimal-radix-directive-lower :print-case :downcase))
+
+(defmethod interpret-item
+    (client (directive hexadecimal-radix-directive-lower) &optional parameters)
+  (apply #'print-radix-arg client (colon-p directive) (at-sign-p directive) 16 parameters))
+
+(defmethod compile-item
+    (client (directive hexadecimal-radix-directive-lower) &optional parameters)
+  (setf (print-case directive) :downcase)
+  `((print-radix-arg ,(incless:client-form client) ,(colon-p directive)
+                     ,(at-sign-p directive) 16 ,@parameters)))
+
+(defclass hexadecimal-radix-directive-upper (base-radix-directive)
   ())
 
 (defmethod specialize-directive
     ((client t) (char (eql #\X)) directive (end-directive t))
-  (change-class directive 'hexadecimal-radix-directive))
+  (change-class directive 'hexadecimal-radix-directive-upper :print-case :upcase))
 
 (defmethod interpret-item
-    (client (directive hexadecimal-radix-directive) &optional parameters)
+    (client (directive hexadecimal-radix-directive-upper) &optional parameters)
   (apply #'print-radix-arg client (colon-p directive) (at-sign-p directive) 16 parameters))
 
 (defmethod compile-item
-    (client (directive hexadecimal-radix-directive) &optional parameters)
+    (client (directive hexadecimal-radix-directive-upper) &optional parameters)
   `((print-radix-arg ,(incless:client-form client) ,(colon-p directive) ,(at-sign-p directive) 16 ,@parameters)))

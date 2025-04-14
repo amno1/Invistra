@@ -93,7 +93,9 @@
    ;; true if and only if the `:' modifier was given
    (%colon-p :initarg :colon-p :reader colon-p)
    ;; true if and only if the `@' modifier was given
-   (%at-sign-p :initarg :at-sign-p :reader at-sign-p)))
+   (%at-sign-p :initarg :at-sign-p :reader at-sign-p)
+   ;; some arguments might specify printing case
+   (%print-case :initarg :print-case :type keyword :initform :upcase :accessor print-case)))
 
 ;;; Mixin class for directives that take no modifiers
 (defclass no-modifiers-mixin () ())

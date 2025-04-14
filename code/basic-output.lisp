@@ -73,7 +73,7 @@
   ())
 
 (defmethod specialize-directive
-    (client (char (eql #\%)) directive end-directive)
+    (client (char (eql #\~)) directive end-directive)
   (declare (ignore client end-directive))
   (change-class directive 'percent-directive))
 
@@ -185,7 +185,7 @@
   ())
 
 (defmethod specialize-directive
-    (client (char (eql #\~)) directive end-directive)
+    (client (char (eql *control-char*)) directive end-directive)
   (declare (ignore client end-directive))
   (change-class directive 'tilde-directive))
 
@@ -198,15 +198,15 @@
 
 (defmethod interpret-item (client (directive tilde-directive) &optional parameters)
   (loop repeat (car parameters)
-        do (write-char #\~ *destination*)))
+        do (write-char *control-char* *destination*)))
 
 (defmethod compile-item (client (directive tilde-directive) &optional parameters)
   (let ((n (car parameters)))
     (case n
       (0 nil)
-      (1 `((write-char #\~ *destination*)))
-      (2 `((write-char #\~ *destination*)
-           (write-char #\~ *destination*)))
+      (1 `((write-char *control-char* *destination*)))
+      (2 `((write-char *control-char* *destination*)
+           (write-char *control-char* *destination*)))
       (otherwise
        `((loop repeat ,n
-               do (write-char #\~ *destination*)))))))
+               do (write-char *control-char* *destination*)))))))
