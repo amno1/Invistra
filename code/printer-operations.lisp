@@ -14,6 +14,10 @@
     ((client t) (char (eql #\A)) directive (end-directive t))
   (change-class directive 'a-directive))
 
+(defmethod specialize-directive
+    ((client t) (char (eql #\s)) directive (end-directive t))
+  (change-class directive 'a-directive))
+
 (defmethod parameter-specifications ((client t) (directive a-directive))
   '((:name mincol :type integer :default 0)
     (:name colinc :type (integer 0) :default 1)
