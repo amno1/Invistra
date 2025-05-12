@@ -82,9 +82,9 @@
       (setf (slot-value directive 'precision)
             (case last
               (#\g 1)
-              (or #\f #\e 6)
-              (otherwise 0))))
-    
+              (#\f 6)
+              (#\e 6)
+              (t 0))))
     (setf (consume-argument-p directive) t)
 
     directive))
