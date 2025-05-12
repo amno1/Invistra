@@ -1,6 +1,7 @@
 (defpackage #:invistra
   (:use #:cl)
-  (:shadow #:format
+  (:shadow #:while
+           #:format
            #:formatter)
   #+sicl
   (:local-nicknames (:trivial-gray-streams :cyclosis))
@@ -18,6 +19,9 @@
            #:format-compiler-macro
            #:formatter
            #:interpret-item
+           #:parser
+           #:*format-parser*
            #:parameter-specifications
+           #:parse-directive
            #:parse-directive-suffix
            #:specialize-directive))

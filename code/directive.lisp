@@ -79,7 +79,11 @@
 ;;; a class instance for each directive, but most format directives
 ;;; are handled at compile time anyway.
 (defclass directive ()
-  (;; the entire control string in which this directive was found
+  ((%argument
+    :initarg :argument :initform nil :accessor directive-argument)
+   (%consume-argument
+    :initarg :consume-argument :initform nil :accessor consume-argument-p)
+   ;; the entire control string in which this directive was found
    (%control-string :initarg :control-string :reader control-string)
    ;; the position in the control string of the ~ character.
    (%start :initarg :start :reader start)
@@ -87,7 +91,7 @@
    ;; the first position beyond the directive character
    (%end :initarg :end :reader end)
    ;; The directive character used.
-   (%directive-character :initarg :directive-character :reader directive-character)
+   (%directive-character :initarg :directive-character :initform nil :reader directive-character)
    ;; a list of parameters, each one is either an integer or a character
    (%parameters :initarg :parameters :accessor parameters)
    ;; true if and only if the `:' modifier was given

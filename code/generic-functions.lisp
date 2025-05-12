@@ -20,6 +20,16 @@
 (defgeneric check-directive-syntax (client directive)
   (:method-combination progn :most-specific-last))
 
+;;; Print an argument to string
+(defgeneric argument-to-string (directive)
+  (:method (directive)
+    (declare (ignore directive))))
+
+;;; Parse a control string into a directive object
+(defgeneric parse-directive (tokens control-string parser)
+  (:method (tokens control-string parser)
+    (declare (ignore tokens control-string parser))))
+
 (defgeneric interpret-item (client item &optional parameters)
   (:method (client item &optional parameters)
     (declare (ignore client item parameters))))

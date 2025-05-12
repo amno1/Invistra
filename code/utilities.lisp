@@ -1,5 +1,16 @@
 (cl:in-package #:invistra)
 
+(declaim (inline new))
+(defun new (class &rest args)
+  (apply #'make-instance class args))
+
+(defmacro while (test &rest body)
+  `(cl:do () ((cl:not ,test) nil) ,@body))
+
+(declaim (inline array-last))
+(defun array-last (array)
+  (aref array (1- (length array))))
+
 ;;; For certain common types used by FORMAT, return a string
 ;;; explaining in English what the type means.  For other
 ;;; types, return a string "an object of type <type>"
