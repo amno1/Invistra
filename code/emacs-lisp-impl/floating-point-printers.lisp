@@ -7,6 +7,10 @@
 
 (setf *read-default-float-format* 'double-float)
 
+(declaim (inline ensure-float))
+(defun ensure-float (value)
+  (coerce value 'double-float))
+
 (defclass elisp-float-directive (elisp-directive)
   ((exponent
     :initarg :exponent :type (or null integer) :initform 0 :accessor
@@ -50,17 +54,15 @@
               (*print-escape* nil)
               (*print-readably* nil))
           (write value :stream *destination*))
-        (let ((coerced-value (if (floatp value)
-                                 value
-                                 (coerce value 'double-float)))
-              (client (directive-client directive)))
+        (let ((client (directive-client directive))
+              (value (ensure-float value)))
           (multiple-value-bind (significand exponent sign)
-              (quaviver:float-triple client 10 coerced-value)
+              (quaviver:float-triple client 10 value)
             (setf (slot-value directive 'sign-char)
                   (cond ((minusp sign) #\-)
                         ((print-sign-p directive) #\+)))
             (funcall printer
-                     coerced-value
+                     value
                      significand
                      exponent
                      (argument-width directive)
@@ -282,6 +284,7 @@
                                    #+abcl #\E #-abcl #\e
                                    (etypecase value
                                      (short-float #+abcl #\S #-abcl #\s)
+                                     #-sbcl
                                      (single-float #+abcl #\F #-abcl #\f)
                                      (double-float #+abcl #\D #-abcl #\d)
                                      (long-float #+abcl #\L #-abcl #\l))))
@@ -307,44 +310,57 @@
 
 ;; %g General floating point.
 
+(defclass quaviver-client (quaviver/native:client) ())
 (defclass g-elisp-directive (elisp-float-directive) ())
+
+(defun limit-significand-digits (value limit)
+  (let ((client (new 'quaviver-client)))
+    (multiple-value-bind (significand exponent sign)
+        (quaviver:float-triple client 10 value)
+      (declare (type fixnum significand))
+      (let* ((digit-count (quaviver.math:count-digits 10 significand))
+             (fractional-position (if (zerop significand)
+                                       0
+                                       digit-count)))
+        (multiple-value-bind (significand digit-count fractional-position)
+            (trim-fractional
+             significand digit-count fractional-position limit)
+          (values (quaviver:triple-float
+                   client 'double-float 10 significand exponent sign)
+                  digit-count fractional-position))))))
 
 (defmethod specialize-directive
     ((client t) (char (eql #\g)) directive (end-directive t))
-  (let ((value (directive-argument directive))
-        (directive (change-class directive 'elisp-float-directive :client client))) 
-    (typecase value
-      (integer
-       (change-class directive 'd-elisp-directive :precision 0))
-      (float
-       (multiple-value-bind (significand exponent sign)
-           (quaviver:float-triple client 10 value)
-         (declare (type fixnum significand))
-         
-         (let*  ((d (argument-precision directive))
-                 (digit-count (quaviver.math:count-digits 10 significand)))
-           ;; (cl:format t "rv: ~a t: ~a s ~a e ~a sc ~a sign ~a ~%"
-           ;;            (car rounded) (type-of significand) significand exponent
-           ;;            significand-count sign)
-           (setf (slot-value directive 'sign-char)
-                 (cond ((minusp sign) #\-)
-                       ((print-sign-p directive) #\+)))
-           (unless d
-             (let ((q (if (minusp exponent)
-                          (- digit-count exponent)
-                          (max digit-count exponent))))
-               (setq d (max q (min exponent 7)))))
-           
-           (cond
-             ((= d 1)
-              (change-class directive 'e-elisp-directive :k 1 :precision 0)
-              (print-arg directive *destination*))
-             ((or (< exponent -4) (>= exponent d))
-              (change-class directive 'e-elisp-directive :k 1 :precision 5)
-              (print-arg directive *destination*))
-             (t
-              (change-class directive 'f-elisp-directive :precision (abs exponent))
-              (print-arg directive *destination*)))))))))
+  (let ((directive
+          (change-class directive 'elisp-float-directive
+                        :argument (ensure-float (directive-argument directive))
+                        :client client :precision 6)))
+    (multiple-value-bind (value digit-count fractional-position)
+        (limit-significand-digits
+         (directive-argument directive) (argument-precision directive))
+      (setf (directive-argument directive) value)
+      (multiple-value-bind (significand exponent sign)
+          (quaviver:float-triple client 10 (directive-argument directive))
+        (declare (type fixnum significand))
+        (let*  ((d (argument-precision directive))
+                (digit-count (quaviver.math:count-digits 10 significand)))
+          (declare (type fixnum significand))
+          (setf (slot-value directive 'sign-char)
+                (cond ((minusp sign) #\-)
+                      ((print-sign-p directive) #\+)))
+          (unless d
+            (let ((q (if (minusp exponent)
+                         (- digit-count exponent)
+                         (max digit-count exponent))))
+              (setq d (max q (min exponent 7)))))
+          
+          (cond
+            ((or (< exponent -4) (>= exponent d) (> digit-count d))
+             (change-class directive 'e-elisp-directive :k 1 :precision 5)
+             (print-arg directive *destination*))
+            (t
+             (change-class directive 'f-elisp-directive :precision (abs exponent))
+             (print-arg directive *destination*))))))))
 
 ;; (defmethod compile-item (client (directive g-directive) &optional parameters)
 ;;   `((print-float-arg ,(incless:client-form client)
