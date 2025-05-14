@@ -12,6 +12,7 @@
   :depends-on ("acclimation"
                "incless"
                "invistra"
+               "quaviver/native"
                (:feature (:not :sicl) "inravina")
                "nontrivial-gray-streams")
   :components ((:module "code/emacs-lisp-impl"
