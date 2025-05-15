@@ -57,10 +57,7 @@
 
 (defmethod interpret-item (client (directive d-elisp-directive) &optional args)
   (declare (ignore client args))
-  (change-class
-   directive 'elisp-radix-directive
-   :prefix ""
-   :radix 10)
+  (change-class directive 'elisp-radix-directive :prefix "" :radix 10)
   (print-arg directive *destination*))
 
 (defclass o-elisp-directive (elisp-directive) ())
