@@ -4,9 +4,7 @@
   ((case
     :initarg :case :initform nil :type symbol :accessor parameter-case)
    (radix
-    :initarg :radix :type integer :accessor parameter-radix)
-   (restrict-width
-    :initarg :restrict-width :type boolean :initform nil :accessor restrict-width)))
+    :initarg :radix :type integer :accessor parameter-radix)))
 
 (defmethod argument-to-string ((parameter elisp-radix-directive))
   (let ((value (directive-argument parameter))

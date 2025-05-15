@@ -1,8 +1,6 @@
 (in-package #:invistra)
 
-(defclass elisp-general-directive (elisp-directive)
-  ((restrict-width
-    :initarg :restrict-width :type boolean :initform nil :accessor restrict-width)))
+(defclass elisp-general-directive (elisp-directive) ())
 
 (defclass |s-elisp-directive| (elisp-general-directive) ())
 
