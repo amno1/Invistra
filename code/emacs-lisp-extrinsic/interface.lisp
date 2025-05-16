@@ -2,8 +2,15 @@
 
 (defclass elisp-parser (invistra:parser) ())
 
+(eval-when (:execute :compile-toplevel)
+  (declaim
+   (sb-ext:disable-package-locks *read-default-float-format*))
+
+  (setf *read-default-float-format* 'double-float))
+
 (invistra:define-interface (incless-extrinsic:*client*
                             incless-extrinsic:extrinsic-client)
+  
   (let ((parser
           (make-instance
            'elisp-parser

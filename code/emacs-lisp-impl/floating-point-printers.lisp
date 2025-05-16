@@ -2,11 +2,6 @@
 
 (in-package #:invistra)
 
-(declaim
- (sb-ext:disable-package-locks *read-default-float-format*))
-
-(setf *read-default-float-format* 'double-float)
-
 (declaim (inline ensure-float))
 (defun ensure-float (value)
   (coerce value 'double-float))
@@ -315,41 +310,31 @@
 
 (defvar *quaviver-native-client* (new 'quaviver-client))
 
-(declaim (inline sign))
-(defun sign (value)
-  (cond ((minusp value) -1)
-        ((= 0 value) 0)
-        (t 1)))
-
-(defgeneric digit-count (client value)
-  (:method (client (value integer))
+(defgeneric digit-count (client value precision)
+  (:method (client (value integer) precision)
     (declare (type fixnum value)
              (ignore client))
-    (cl:format t "fixnum value~%")
     (values value value
-            (quaviver.math:count-digits 10 value) 0 (sign value)))
-  (:method (client (value float))
-    (declare (type double-float value))
+            (quaviver.math:count-digits 10 value)
+            0 precision (sign value)))
+  (:method (client (value float) precision)
+    (declare (type double-float value)
+             (ignore precision))
     (multiple-value-bind (significand exponent sign)
         (quaviver:float-triple client 10 value)
       (declare (type fixnum significand))
-      (cl:format t "floating value~%")
       (values value significand
-              (quaviver.math:count-digits 10 significand) 0 sign)))
+              (quaviver.math:count-digits 10 significand)
+              0 exponent sign)))
   (:documentation
    "Return number of digits for a VALUE in base 10."))
 
 (defun limit-significand-digits (limit value significand digit-count exponent sign)
   (declare (type fixnum significand digit-count exponent sign))
   (let ((client *quaviver-native-client*))
-    (cl:format t "v1: ~a s: ~a c: ~a e: ~a +: ~a ~%"
-               value significand digit-count exponent sign)
     (multiple-value-bind (s dc fp)
-        (trim-fractional significand digit-count
-                         exponent (min digit-count limit))
+        (trim-fractional significand digit-count 0 (min digit-count limit))
       (declare (type fixnum s dc fp))
-      (cl:format t "v2: ~a s: ~a c: ~a e: ~a +: ~a ~%"
-                 value s dc exponent sign)
       (values
        (quaviver:triple-float client 'double-float 10 s exponent sign)
        dc fp exponent))))
@@ -357,40 +342,50 @@
 (defmethod specialize-directive
     ((client t) (char (eql #\g)) directive (end-directive t))
   (let ((precision (argument-precision directive))
-        (floating-point 0))
-    (multiple-value-bind (value significand digit-count exponent sign)
-        (digit-count *quaviver-native-client* (directive-argument directive))
-      (declare (type fixnum significand digit-count exponent sign))
-      (cl:format t "precision ~a dc: ~a~%" precision digit-count)
-      (cl:format t "v: ~a s: ~a c: ~a e: ~a +: ~a~%"
-                 value significand digit-count exponent sign)
-      (when (> digit-count precision)
-        (multiple-value-bind (v dc fp e)
-            (limit-significand-digits
-             precision value significand digit-count exponent sign)
-          (setf value v exponent e floating-point fp digit-count dc)))
-      (setf (slot-value directive 'sign-char)
-            (cond ((minusp sign) #\-)
-                  ((print-sign-p directive) #\+)))
-      (cl:format t "v: ~a s: ~a c: ~a e: ~a p: ~a~%"
-                 value significand digit-count exponent floating-point)
-      (cond
-        ((integerp value)
-         (change-class directive 'd-elisp-directive :precision 0))
-        ((or (< exponent -4) (>= exponent precision))
-         (change-class directive 'e-elisp-directive
-                       :argument value :client client
-                       :exponent exponent :k 1))
-        (t
-         (change-class directive 'f-elisp-directive
-                       :argument value
-                       :precision (1+ (abs exponent))
-                       :client client)))
-      (interpret-item client directive))))
-
-;; (defmethod compile-item (client (directive g-directive) &optional parameters)
-;;   `((print-float-arg ,(incless:client-form client)
-;;                      (lambda (client value significand exponent sign)
-;;                        (print-general-arg client value significand exponent sign
-;;                                           ,(colon-p directive) ,(at-sign-p directive)
-;;                                           ,@parameters)))))
+        (value (directive-argument directive)))
+    (declare (type fixnum precision))
+    (multiple-value-bind (value significand digit-count prec exponent sign)
+        (digit-count *quaviver-native-client* value precision)
+      (declare (type fixnum significand digit-count exponent prec sign)
+               (ignore prec))
+      (when (and (integerp value) (<= digit-count precision))
+        (return-from specialize-directive
+          (change-class directive 'd-elisp-directive :precision 0)))
+      (let* ((decimal-places (if (integerp value) 0 (abs exponent)))
+             (significant-places (- digit-count decimal-places))
+             (e exponent))
+        (setf exponent (+ significant-places))
+        (cond
+          ((>= exponent precision)
+          (return-from specialize-directive
+            (change-class directive 'e-elisp-directive
+                          :argument value
+                          :client client
+                          :precision (if (minusp e) (1- precision) 0)
+                          :k 1 :e 2)))
+          ((< exponent -4)
+              (return-from specialize-directive
+                (change-class directive 'e-elisp-directive
+                              :argument value
+                              :client client
+                              :precision (1- precision)
+                              :k 1 :e 2)))
+          (t 
+             (multiple-value-bind (float-value dc fp e)
+                 (limit-significand-digits
+                  precision
+                  value significand significant-places
+                  (- decimal-places) sign)
+               (declare (type fixnum dc fp e)
+                        (ignore dc fp))
+               (cl:format t "float ~a ~a ~a ~a ~a ~a~%"
+                          value significant-places decimal-places dc fp e )
+               (return-from specialize-directive
+                 (change-class directive 'f-elisp-directive
+                               :argument value
+                               :client client
+                               :k 0
+                               :precision (if (<= (1- precision) (abs e))
+                                              0
+                                              (min (- precision significant-places)
+                                                   decimal-places)))))))))))
