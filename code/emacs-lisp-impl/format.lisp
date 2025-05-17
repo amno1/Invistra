@@ -7,7 +7,7 @@
     (let ((parser *format-parser*)
           (*destination* stream))
       (dolist (item (split-control-string control parser args))
-        (interpret-item client
-                        (specialize-directive client
-                                              (directive-character item)
-                                              item nil) stream)))))
+        (interpret-item
+         client
+         (specialize-directive
+          client (directive-character item) item nil) stream)))))

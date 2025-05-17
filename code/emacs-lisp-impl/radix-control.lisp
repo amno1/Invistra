@@ -10,6 +10,7 @@
   (let ((value (directive-argument parameter))
         (radix (parameter-radix parameter)))
     (declare (type fixnum radix))
+    ;; (cl:format t "radix: ~a~%" radix)
     (when (minusp value)
       (setf (slot-value parameter 'sign-char) #\-))
     (setf value (if (floatp value) (abs (floor value)) (abs value)))
@@ -18,11 +19,10 @@
            (prefix (argument-prefix parameter))
            (print-case (parameter-case parameter))
            (precision (argument-precision parameter)))
-      (declare (type fixnum value radix))
-      ;;(cl:format t "radix: ~a~%" radix)
+      (declare (type fixnum value))
       (let ((digit-count (quaviver.math:count-digits radix value)))
         (with-output-to-string (stream)
-          (when (> (length prefix) 1)    
+          (when prefix    
             (princ prefix stream))
           (when (> precision digit-count)
             (loop repeat (- precision digit-count)
@@ -36,7 +36,7 @@
              (return-from argument-to-string
                (string-downcase (get-output-stream-string stream))))))))))
 
-(defclass b-elisp-directive (elisp-radix-directive) ())
+(defclass b-elisp-directive (elisp-directive) ())
 
 (defmethod specialize-directive
     (client (char (eql #\b)) directive end-directive)
