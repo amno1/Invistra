@@ -65,7 +65,8 @@
                      (directive-k directive)
                      (directive-k directive)
                      (overflow-char directive)
-                     (exponent-char directive)))))))
+                     (exponent-char directive)
+                     (argument-prefix directive)))))))
 
 (defun round-away-from-zero (x n)
   (multiple-value-bind (q r)
@@ -106,7 +107,8 @@
     (let ((*destination* stream))
       (print-float-arg directive #'print-fixed-arg))))
 
-(defun print-fixed-arg (value significand exponent w d k e overflowchar exponentchar)
+(defun print-fixed-arg (value significand exponent
+                        w d k e overflowchar exponentchar trailing-dot)
   (declare (ignore e exponentchar)
            (type fixnum significand))
   (let* ((digit-count (quaviver.math:count-digits 10 significand))
@@ -176,7 +178,9 @@
             (t
              (loop repeat w
                    do (write-char overflowchar *destination*))
-             t)))))
+             t))
+      (when (and trailing-dot (>= fractional-position 0 ))
+        (write-char #\. *destination*)))))
 
 (defmethod specialize-directive
     (client (char (eql #\f)) directive end-directive)
@@ -212,7 +216,8 @@
     (let ((*destination* s))
       (print-float-arg directive #'print-exponent-arg))))
 
-(defun print-exponent-arg (value significand exponent w d e k overflowchar exponentchar)
+(defun print-exponent-arg (value significand exponent
+                           w d e k overflowchar exponentchar trailing-dot)
   (declare (type fixnum significand))
   (let* ((digit-count (quaviver.math:count-digits 10 significand))
          (fractional-position k)
@@ -266,14 +271,14 @@
                            (< (compute-width) w))))
           (setf leading-zeros 1
                 fractional-position (1+ fractional-position)))
-        ;;(cl:format t "fp: ~a lz: ~a~%" fractional-position leading-zeros)
         (cond ((or (null w)
                    (null overflowchar)
                    (<= (compute-width) w))
                (quaviver:write-digits 10 my-significand *destination*
                                       :leading-zeros leading-zeros
                                       :fractional-position fractional-position
-                                      :fractional-marker #\.)
+                                      :fractional-marker
+                                      (when (or (> d 1) trailing-dot) #\.))
                (write-char (or exponentchar
                                (if (typep value *read-default-float-format*)
                                    #+abcl #\E #-abcl #\e
@@ -316,7 +321,7 @@
              (ignore client))
     (values value value
             (quaviver.math:count-digits 10 value)
-            0 precision (sign value)))
+            0 precision (if (minusp value) -1 1)))
   (:method (client (value float) precision)
     (declare (type double-float value)
              (ignore precision))
@@ -329,21 +334,24 @@
   (:documentation
    "Return number of digits for a VALUE in base 10."))
 
-(defun limit-significand-digits (limit value significand digit-count exponent sign)
+(defun limit-significand-digits (limit significand digit-count exponent sign)
   (declare (type fixnum significand digit-count exponent sign))
   (let ((client *quaviver-native-client*))
     (multiple-value-bind (s dc fp)
         (trim-fractional significand digit-count 0 (min digit-count limit))
-      (declare (type fixnum s dc fp))
+      (declare (type fixnum s dc fp)
+               (ignore dc fp))
       (values
        (quaviver:triple-float client 'double-float 10 s exponent sign)
-       dc fp exponent))))
+       exponent))))
 
 (defmethod specialize-directive
     ((client t) (char (eql #\g)) directive (end-directive t))
   (let ((precision (argument-precision directive))
         (value (directive-argument directive)))
     (declare (type fixnum precision))
+    (when (zerop precision)
+      (setf precision 1))
     (multiple-value-bind (value significand digit-count prec exponent sign)
         (digit-count *quaviver-native-client* value precision)
       (declare (type fixnum significand digit-count exponent prec sign)
@@ -371,15 +379,12 @@
                               :precision (1- precision)
                               :k 1 :e 2)))
           (t 
-             (multiple-value-bind (float-value dc fp e)
+             (multiple-value-bind (float-value e)
                  (limit-significand-digits
-                  precision
-                  value significand significant-places
-                  (- decimal-places) sign)
-               (declare (type fixnum dc fp e)
-                        (ignore dc fp))
-               (cl:format t "float ~a ~a ~a ~a ~a ~a~%"
-                          value significant-places decimal-places dc fp e )
+                  precision significand significant-places (- decimal-places) sign)
+               (declare (type fixnum e))
+               (cl:format t "float ~a ~a ~a ~a~%"
+                          value significant-places decimal-places e )
                (return-from specialize-directive
                  (change-class directive 'f-elisp-directive
                                :argument value
