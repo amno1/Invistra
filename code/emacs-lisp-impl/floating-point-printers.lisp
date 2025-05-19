@@ -168,7 +168,8 @@
                     (setf leading-zeros 1)))
              (cond ((= d 0)
                     (quaviver:write-digits 10 my-significand *destination*
-                                           :leading-zeros leading-zeros))
+                                           ;:leading-zeros leading-zeros
+                                           ))
                    (t
                     (quaviver:write-digits 10 my-significand *destination*
                                            :leading-zeros leading-zeros
@@ -229,6 +230,7 @@
     (declare (type fixnum my-exponent))
     (let* ((exp-count (quaviver.math:count-digits 10 (abs my-exponent)))
            (leading-exp-zeros (1+ (- (or e exp-count) exp-count))))
+      (when (= leading-exp-zeros 0) (incf leading-exp-zeros))
       (flet ((compute-width ()
                (+ 3
                   leading-zeros
@@ -345,11 +347,38 @@
        (quaviver:triple-float client 'double-float 10 s exponent sign)
        exponent))))
 
+(defun specialize-elisp-g (client directive value precision exponent decimal-places)
+  (let ((k 0))
+    (when (eq precision 'shift)
+      (setf k 0 precision 1 exponent 0 decimal-places 0))
+    (cond
+      ((>= exponent precision)
+       (cl:format t "e1: ~a ~a~%" precision exponent)
+       (change-class directive 'e-elisp-directive
+                     :client client
+                     :argument value
+                     :precision decimal-places
+                     :k k))
+      ((< exponent -4)
+       (cl:format t "e2: ~a ~a~%" precision exponent)
+       (change-class directive 'e-elisp-directive
+                     :client client
+                     :argument value
+                     :precision decimal-places
+                     :k k))
+      (t
+       (cl:format t "f: ~a ~a ~a~%" precision exponent decimal-places)
+       (change-class directive 'f-elisp-directive
+                     :client client
+                     :argument value
+                     :precision decimal-places
+                     :k k)))))
+
 (defmethod specialize-directive
     ((client t) (char (eql #\g)) directive (end-directive t))
   (let ((precision (argument-precision directive))
         (value (directive-argument directive)))
-    (declare (type fixnum precision))
+    (declare (type (or symbol fixnum) precision))
     (when (zerop precision)
       (setf precision 1))
     (multiple-value-bind (value significand digit-count prec exponent sign)
@@ -359,38 +388,190 @@
       (when (and (integerp value) (<= digit-count precision))
         (return-from specialize-directive
           (change-class directive 'd-elisp-directive :precision 0)))
+      
       (let* ((decimal-places (if (integerp value) 0 (abs exponent)))
              (significant-places (- digit-count decimal-places))
-             (e exponent))
-        (setf exponent (+ significant-places))
+             k)
+        (declare (ignore k))
+        (cl:format t "B: ~a ~a ~a ~a ~a~%"
+                   digit-count precision exponent significant-places decimal-places)
+        (when (> significant-places precision)
+          (cl:format t ">:~a ~a ~a ~a~%"
+                     digit-count significant-places decimal-places exponent)
+          (setf 
+                value (limit-significand-digits precision significand
+                                                significant-places exponent sign)
+                exponent (+ exponent significant-places)
+                ))
+        (cl:format t "A: ~a ~a ~a ~a ~a~%"
+                   digit-count precision exponent significant-places decimal-places)
         (cond
-          ((>= exponent precision)
-          (return-from specialize-directive
-            (change-class directive 'e-elisp-directive
-                          :argument value
-                          :client client
-                          :precision (if (minusp e) (1- precision) 0)
-                          :k 1 :e 2)))
-          ((< exponent -4)
-              (return-from specialize-directive
-                (change-class directive 'e-elisp-directive
-                              :argument value
-                              :client client
-                              :precision (1- precision)
-                              :k 1 :e 2)))
-          (t 
-             (multiple-value-bind (float-value e)
-                 (limit-significand-digits
-                  precision significand significant-places (- decimal-places) sign)
-               (declare (type fixnum e))
-               (cl:format t "float ~a ~a ~a ~a~%"
-                          value significant-places decimal-places e )
-               (return-from specialize-directive
-                 (change-class directive 'f-elisp-directive
-                               :argument value
-                               :client client
-                               :k 0
-                               :precision (if (<= (1- precision) (abs e))
-                                              0
-                                              (min (- precision significant-places)
-                                                   decimal-places)))))))))))
+          ((>= significant-places precision)
+           (cl:format t "1: ~a ~a ~a ~a ~a~%"
+                      digit-count precision exponent significant-places decimal-places)
+           (setf exponent 0 decimal-places 0))
+          ((and (<= digit-count precision (abs exponent)) (<= (abs exponent) precision ))
+           (cl:format t "2: ~a ~a ~a ~a ~a~%"
+                      digit-count precision exponent significant-places decimal-places)
+           (setf exponent 0))
+          ((and (> decimal-places (abs exponent) precision 0))
+           (cl:format t "3: ~a ~a ~a ~a ~a~%"
+                      digit-count precision exponent significant-places
+                      decimal-places)
+           ;; missusing precision and exponent
+           (setf exponent -1 decimal-places 1  precision 'shift))
+          ((and (> decimal-places precision) (= (abs exponent) digit-count))
+           (cl:format t "3A: ~a ~a ~a ~a ~a~%"
+                      digit-count precision exponent significant-places decimal-places)
+           (setf exponent 0 decimal-places 0))
+          ((and (> decimal-places precision) (= (abs exponent) digit-count))
+           (cl:format t "4: ~a ~a ~a ~a ~a~%"
+                      digit-count precision exponent significant-places decimal-places)
+           (setf decimal-places
+                 (min (- precision significant-places)
+                      (1- precision)
+                      (- digit-count significant-places))
+                 exponent (if (> significant-places 0)
+                              0
+                              exponent)))
+          ((and (> significant-places 0) (> decimal-places precision))
+           (cl:format t "5: ~a ~a ~a ~a ~a~%"
+                      digit-count precision exponent significant-places decimal-places)
+           (setf exponent 0 decimal-places (- precision significant-places)))
+          ((and (> significant-places 0) (= decimal-places precision))
+           (cl:format t "6: ~a ~a ~a ~a ~a~%"
+                      digit-count precision exponent significant-places decimal-places)
+           (setf exponent 0 decimal-places (- precision significant-places)))
+          (t
+           (cl:format t "T: ~a ~a ~a ~a ~a~%"
+                      digit-count precision exponent significant-places decimal-places)
+           ))
+        
+        (cl:format t "L: ~a ~a ~a ~a ~a~%"
+                   digit-count precision exponent significant-places decimal-places)
+        (specialize-elisp-g
+         client directive value precision exponent decimal-places)))))
+
+;; (cond
+;;   ((>= exponent precision)
+;;    (setf k 0 pp 0))
+;;   ((<= decimal-places precision)
+;;    (setf k 1 pp p))
+;;   (t
+;;    (setf k 1 pp precision)))
+
+;; (multiple-value-bind (value significand digit-count prec exponent sign)
+;;         (digit-count *quaviver-native-client* value precision)
+;;       (setf exponent (+ significant-places)
+;;             precision decimal-places))
+
+;; (defmethod specialize-directive
+;;     ((client t) (char (eql #\g)) directive (end-directive t))
+;;   (let ((precision (argument-precision directive))
+;;         (value (directive-argument directive)))
+;;     (declare (type fixnum precision))
+;;     (when (zerop precision)
+;;       (setf precision 1))
+;;     (multiple-value-bind (value significand digit-count prec exponent sign)
+;;         (digit-count *quaviver-native-client* value precision)
+;;       (declare (type fixnum significand digit-count exponent prec sign)
+;;                (ignore prec))
+;;       (when (and (integerp value) (<= digit-count precision))
+;;         (return-from specialize-directive
+;;           (change-class directive 'd-elisp-directive :precision 0)))
+      
+;;       (let* ((decimal-places (if (integerp value) 0 (abs exponent)))
+;;              (significant-places (- digit-count decimal-places)))
+
+;;       (when (> digit-count precision)
+;;         (setf value (limit-significand-digits
+;;                      precision significand
+;;                      significant-places (- decimal-places)
+;;                      sign)))
+;;     (multiple-value-bind (value significand digit-count prec exponent sign)
+;;         (digit-count *quaviver-native-client* value precision)
+;;         (setf exponent (+ significant-places))
+;;         (let ((p (1- precision))
+;;               (dd (abs (- digit-count precision)))
+;;               k pp)
+;;           (cond
+;;             ((>= exponent precision)
+;;              (cl:format t "1: ~a ~a ~a ~a ~a ~a~%"
+;;                         significant-places decimal-places digit-count exponent
+;;                         precision dd)
+;;              (cond
+;;                ((>= dd precision)
+;;                 (setf k 0 pp 0))
+;;                ((<= decimal-places precision)
+;;                 (setf k 1 pp p))
+;;                (t
+;;                 (setf k 1 pp precision)))
+;;              (return-from specialize-directive               
+;;                   (change-class directive 'e-elisp-directive
+;;                                 :argument value
+;;                                 :client client
+;;                                 :precision pp
+;;                                 :k k)))
+;;             ((< exponent -4)
+;;              (cl:format t "2: ~a ~a ~a ~a ~a~%"
+;;                         significant-places decimal-places digit-count exponent precision)
+;;              (return-from specialize-directive
+;;                (change-class directive 'e-elisp-directive
+;;                              :argument value
+;;                              :client client
+;;                              :precision (1- precision)
+;;                              :k 0)))
+;;             (t
+;;              (cond
+;;                ((<= digit-count decimal-places precision)
+;;                   (cl:format t "first: ~a ~a ~a ~a ~a ~a~%"
+;;                              significant-places decimal-places digit-count exponent
+;;                              precision dd)
+;;                 (return-from specialize-directive
+;;                   (change-class directive 'f-elisp-directive
+;;                                 :argument value
+;;                                 :client client
+;;                                 :precision decimal-places
+;;                                 :k 0
+;;                                 )))
+;;                (t
+;;                 (cl:format t "3: ~a ~a ~a ~a ~a ~a~%"
+;;                            significant-places decimal-places digit-count exponent
+;;                            precision dd)
+;;                 (cond
+;;                   ((< digit-count precision)
+;;                    (setf k 0 pp (if (> decimal-places 0)
+;;                                     decimal-places
+;;                                     (abs (- precision significant-places)))))                    
+;;                   (t
+;;                    (setf k 0 pp (abs (- precision significant-places)))))
+;;                 (return-from specialize-directive
+;;                   (change-class directive 'f-elisp-directive
+;;                                 :argument value
+;;                                 :client client
+;;                                 :precision pp
+;;                                 :k k
+;;                                 ))))))))))))
+
+;; (cond
+;;   ((= exponent precision significant-places)
+   
+;;    (return-from specialize-directive
+;;      (change-class directive 'f-elisp-directive
+;;                    :argument value
+;;                    :client client
+;;                    :precision 0
+;;                    :k 0)))
+;;   (t
+;;    (return-from specialize-directive               
+;;      (change-class directive 'e-elisp-directive
+;;                    :argument value
+;;                    :client client
+;;                    :precision pp
+;;                    :k k))))
+
+;; (cond
+;;   ((= significant-places (1- precision)) 0)
+;;   ((< decimal-places precision)  decimal-places)
+;;   ((= decimal-places precision) (1- precision))
+;;   (t 0))
