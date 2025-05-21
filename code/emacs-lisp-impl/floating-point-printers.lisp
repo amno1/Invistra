@@ -351,7 +351,7 @@
     ((client t) (char (eql #\g)) directive (end-directive t))
   (let* ((v (directive-argument directive))
          (p (argument-precision directive)))
-    (multiple-value-bind (significand exponent sign)
+    (multiple-value-bind (significand dp sign)
         (quaviver:float-triple client 10 (coerce v 'float))
       (declare (type fixnum significand)
                (ignore sign))
@@ -359,78 +359,64 @@
         (when (and (integerp v) (<= dc p))
           (return-from specialize-directive
             (change-class directive 'd-elisp-directive :precision 0)))
-        (let* ((q (if (minusp exponent)
-                      (- dc exponent)
-                      (max dc exponent)))
-               (k 0)
-               (d (max q (min exponent p)))
+        (let* ((k 0)
                (e (round (log v)))
-               (ee (abs exponent))
-               (dp ee)
+               (cp p)
+               (p 6)
+               (dp (abs dp))
                (sp (- dc dp))
-               (ww (if (= ee 0) 0 (min ee (1- p))))
-               (dd (- d exponent))
                (exp (cond
-                      ((and (= dc 1) (> exponent (1+ p)))
-                       exponent)
+                      ((and (= dc 1) (> dp (1+ cp))) dp)
                       ((> dc e) 0)
-                      ((= dc e) ee)
-                      ((= sp ee) ee)
-                      ((<= 1 sp p) 0)
-                      ((<= sp dc p) 0)
-                      (t
-                       (cond
-                         ((> sp p) (- 1 dc))
-                         ((= ee p) 0)
-                         ((= dc dp ee) 0)
-                         ((>= ee p)                        
-                          exponent)
-                         (t
-                          (+ exponent p)))))))
-
+                      ((= dc e) dp)
+                      ((= sp dp) dp)
+                      ((<= 1 sp cp) 0)
+                      ((<= sp dc cp) 0)
+                      ((> sp cp) (- 1 dc))
+                      ((= dp cp) 0)
+                      ((= dc dp) 0)
+                      ((>= dp cp) dp)
+                      (t (+ dp cp)))))
           (cond
-            ((< -4 exp p)
+            ((< -4 exp cp)
              (cond
                ((> dc p)
                 (cond
-                  ((and (> ee p) (= exp 0))
-                   (let ((e (round (log v))))
-                     (cond ((= e 0)
-                            (setf p 0))
-                           ((> e sp)
-                            (setf p 0))
-                           (t (setf p (- p sp))))))
+                  ((and (> dp p) (= exp 0))
+                   (cond ((= e 0) (setf p 0))
+                         ((> e sp) (setf p 0))
+                         (t (setf p (- p sp)))))
                   ((= dc sp)
                    (setf p 0))
-                  ((>= ee p)
+                  ((>= dp p)
                    (setf p (if (= (round (log v)) 0) (- p sp) 0)))
                   (t
-                   (setf p (if (= ee p)
+                   (setf p (if (= dp p)
                                0
                                (- p sp))))))
                ((= dc dp)
                 (setf p (if (< dp p) dp p)))
                (t
-                (setf p ww)))                                 
+                (setf p (if (= dp 0) 0 (min dp (1- p))))))                                 
              (change-class directive 'f-elisp-directive
                            :k k
-                           :e ee
+                           :e dp
                            :precision p
                            :client client))
             (t
-             (cond ((= exponent 0)
+             (cond ((= dp 0)
                     (if (<= (abs exp) p)
-                        (setf ee 1 p (1- p))
-                        (setf ee 1 p 0)))
-                   ((>= (abs exponent) p)
-                    (setf ee 0 p 0))
+                        (setf dp 1 p (1- p))
+                        (setf dp 1 p 0)))
+                   ((>= (abs dp) p)
+                    (setf dp 0 p 0))
                    (t
-                    (setf ee 1 p (1- p))))
+                    (setf dp 1 p (1- p))))
              (let ((vv (round v)))
                (if (< vv 10)
                    (change-class directive 'literal-directive
                                  :argument (prin1-to-string vv))
                    (change-class directive 'e-elisp-directive
-                                 :e ee
-                                 :precision p
+                                 :e dp
+                                 :precision (min cp p)
                                  :client client))))))))))
