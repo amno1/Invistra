@@ -418,5 +418,5 @@
                                  :argument (prin1-to-string vv))
                    (change-class directive 'e-elisp-directive
                                  :e dp
-                                 :precision (min cp p)
+                                 :precision (min (1- cp) p)
                                  :client client))))))))))
