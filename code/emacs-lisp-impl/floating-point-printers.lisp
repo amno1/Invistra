@@ -412,11 +412,12 @@
                     (setf dp 0 p 0))
                    (t
                     (setf dp 1 p (1- p))))
-             (let ((vv (round v)))
+             (let ((vv (round v))
+                   (cp (if (> cp 1) (1- cp) 0)))
                (if (< vv 10)
                    (change-class directive 'literal-directive
                                  :argument (prin1-to-string vv))
                    (change-class directive 'e-elisp-directive
                                  :e dp
-                                 :precision (min (1- cp) p)
+                                 :precision (if (= p 0) 0 cp)
                                  :client client))))))))))
