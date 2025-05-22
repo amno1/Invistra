@@ -210,7 +210,7 @@
     (client (char (eql #\e)) directive (end-directive t))
   (change-class
    directive 'e-elisp-directive
-   :client client :e 2 :k 1 :exponent-char #\e))
+   :client client :e 1 :k 1 :exponent-char #\e))
 
 (defmethod argument-to-string ((directive e-elisp-directive))
   (with-output-to-string (s)
@@ -280,7 +280,7 @@
                                       :leading-zeros leading-zeros
                                       :fractional-position fractional-position
                                       :fractional-marker
-                                      (when (or (> d 1) trailing-dot) #\.))
+                                      (when (or (> d 0) trailing-dot) #\.))
                (write-char (or exponentchar
                                (if (typep value *read-default-float-format*)
                                    #+abcl #\E #-abcl #\e
@@ -317,36 +317,6 @@
 
 (defvar *quaviver-native-client* (new 'quaviver-client))
 
-;; (defgeneric digit-count (client value precision)
-;;   (:method (client (value integer) precision)
-;;     (declare (type fixnum value)
-;;              (ignore client))
-;;     (values value value
-;;             (quaviver.math:count-digits 10 value)
-;;             0 precision (if (minusp value) -1 1)))
-;;   (:method (client (value float) precision)
-;;     (declare (type double-float value)
-;;              (ignore precision))
-;;     (multiple-value-bind (significand exponent sign)
-;;         (quaviver:float-triple client 10 value)
-;;       (declare (type fixnum significand))
-;;       (values value significand
-;;               (quaviver.math:count-digits 10 significand)
-;;               0 exponent sign)))
-;;   (:documentation
-;;    "Return number of digits for a VALUE in base 10."))
-
-;; (defun limit-significand-digits (limit significand digit-count exponent sign)
-;;   (declare (type fixnum significand digit-count exponent sign))
-;;   (let ((client *quaviver-native-client*))
-;;     (multiple-value-bind (s dc fp)
-;;         (trim-fractional significand digit-count 0 (min digit-count limit))
-;;       (declare (type fixnum s dc fp)
-;;                (ignore dc fp))
-;;       (values
-;;        (quaviver:triple-float client 'double-float 10 s exponent sign)
-;;        exponent))))
-
 (defmethod specialize-directive
     ((client t) (char (eql #\g)) directive (end-directive t))
   (let* ((v (directive-argument directive))
@@ -360,25 +330,23 @@
           (return-from specialize-directive
             (change-class directive 'd-elisp-directive :precision 0)))
         (let* ((k 0)
-               (e (round (log v)))
-               (cp p)
-               (p 6)
                (dp (abs dp))
                (sp (- dc dp))
+               (e (round (log v)))
                (exp (cond
-                      ((and (= dc 1) (> dp (1+ cp))) dp)
+                      ((and (= dc 1) (> dp (1+ p))) dp)
                       ((> dc e) 0)
                       ((= dc e) dp)
                       ((= sp dp) dp)
-                      ((<= 1 sp cp) 0)
-                      ((<= sp dc cp) 0)
-                      ((> sp cp) (- 1 dc))
-                      ((= dp cp) 0)
-                      ((= dc dp) 0)
-                      ((>= dp cp) dp)
-                      (t (+ dp cp)))))
+                      ((<= 1 sp p) 0)
+                      ((<= sp dc p) 0)
+                      ((> sp p) (- 1 dc))
+                      ((= dp p) 0)
+                      ((= dc p) 0)
+                      ((> dp p) dp)
+                      (t (+ dp p)))))
           (cond
-            ((< -4 exp cp)
+            ((< -4 exp p)
              (cond
                ((> dc p)
                 (cond
@@ -412,12 +380,13 @@
                     (setf dp 0 p 0))
                    (t
                     (setf dp 1 p (1- p))))
-             (let ((vv (round v))
-                   (cp (if (> cp 1) (1- cp) 0)))
-               (if (< vv 10)
+             (let* ((vv (round v)))
+               (cl:format t "~a ~a ~%" dp p)
+               (if (< 0 vv 10)
                    (change-class directive 'literal-directive
                                  :argument (prin1-to-string vv))
                    (change-class directive 'e-elisp-directive
-                                 :e dp
-                                 :precision (if (= p 0) 0 cp)
+                                 :e 1 :k 0
+                                 :argument vv
+                                 :precision p
                                  :client client))))))))))
