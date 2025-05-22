@@ -11,7 +11,7 @@
     :initarg :exponent :type (or null integer) :initform 0 :accessor
     argument-exponent)
    (e
-    :initarg :e :type (or null integer) :initform 0 :accessor argument-e)
+    :initarg :e :type (or null integer) :initform 1 :accessor argument-e)
    (k
     :initarg :k :type (or null integer) :initform 0 :accessor argument-k)
    (significand
@@ -19,7 +19,7 @@
    (digits
     :initarg :digits :type (or null integer) :initform nil :accessor argument-digits)
    (exponentchar
-    :initarg :exponent-char :type (or null character) :initform nil :accessor exponent-char)
+    :initarg :exponent-char :type character :initform #\e :accessor exponent-char)
    (overflowchar
     :initarg :overflow-char :type (or null character) :initform nil :accessor overflow-char)))
 
@@ -208,9 +208,7 @@
 
 (defmethod specialize-directive
     (client (char (eql #\e)) directive (end-directive t))
-  (change-class
-   directive 'e-elisp-directive
-   :client client :e 1 :k 1 :exponent-char #\e))
+  (change-class directive 'e-elisp-directive :client client))
 
 (defmethod argument-to-string ((directive e-elisp-directive))
   (with-output-to-string (s)
@@ -381,12 +379,10 @@
                    (t
                     (setf dp 1 p (1- p))))
              (let* ((vv (round v)))
-               (cl:format t "~a ~a ~%" dp p)
                (if (< 0 vv 10)
                    (change-class directive 'literal-directive
                                  :argument (prin1-to-string vv))
                    (change-class directive 'e-elisp-directive
-                                 :e 1 :k 0
                                  :argument vv
                                  :precision p
                                  :client client))))))))))
