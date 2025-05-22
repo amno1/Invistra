@@ -187,7 +187,7 @@
     (client (char (eql #\f)) directive end-directive)
   (declare (ignore end-directive))
   (change-class
-   directive 'f-elisp-directive :client client :k 0
+   directive 'f-elisp-directive :client client
    :overflow-char (when (pad-right-p directive) (argument-padchar directive))))
 
 (defmethod interpret-item (client (directive f-elisp-directive) &optional parameters)
