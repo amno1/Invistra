@@ -6,7 +6,7 @@
             (if (pretty-print directive)
                 (princ (directive-argument directive) s)
                 (prin1 (directive-argument directive) s)))))
-    (if (> (argument-precision directive) 0)
+    (if (> (length string) (argument-precision directive) 0)
         (subseq string 0 (argument-precision directive))
         string)))
 
