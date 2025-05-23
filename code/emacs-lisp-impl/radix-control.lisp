@@ -19,11 +19,15 @@
            (prefix (argument-prefix parameter))
            (print-case (parameter-case parameter))
            (precision (argument-precision parameter)))
-      (declare (type fixnum value))
+      (declare (type fixnum value radix))
       (let ((digit-count (quaviver.math:count-digits radix value)))
+        (declare (type fixnum radix value))
         (with-output-to-string (stream)
-          (when prefix    
-            (princ prefix stream))
+          (cond
+            ((= radix 8)
+             (when (<= precision digit-count)
+               (princ prefix stream)))
+            (t (princ prefix stream)))
           (when (> precision digit-count)
             (loop repeat (- precision digit-count)
                   do (write-char #\0 stream)))
