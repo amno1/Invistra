@@ -184,6 +184,10 @@
 (def-test-group |s-directive|
     (deftests invistra-emacs-lisp-extrinsic:format
       "%s"      #\a => "97"
+      "%.0s"     11 => ""
+      "%.1s"     11 => "1"
+      "%.2s"     11 => "11"
+      "%.3s"     11 => "11"
       "%s"       97 => "97"
       "%2s"      97 => "97"
       "%-2s"     97 => "97"
