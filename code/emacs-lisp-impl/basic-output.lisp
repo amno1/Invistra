@@ -36,7 +36,7 @@
 (defmethod specialize-directive
     (client (char (eql #\c)) directive end-directive)
   (declare (ignore client end-directive))
-  (change-class directive 'c-elisp-directive :sign-char nil))
+  (change-class directive 'c-elisp-directive :sign-char nil :precision nil))
 
 (defmethod interpret-item (client (directive c-elisp-directive) &optional args)
   (declare (ignore args))

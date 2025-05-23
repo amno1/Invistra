@@ -1,14 +1,19 @@
 (in-package :invistra)
 
 (defmethod argument-to-string (directive)
-  (let ((string
-          (with-output-to-string (s)
-            (if (pretty-print directive)
-                (princ (directive-argument directive) s)
-                (prin1 (directive-argument directive) s)))))
-    (if (> (length string) (argument-precision directive) 0)
-        (subseq string 0 (argument-precision directive))
-        string)))
+  (let* ((string
+           (with-output-to-string (s)
+             (if (pretty-print directive)
+                 (princ (directive-argument directive) s)
+                 (prin1 (directive-argument directive) s))))
+         (length (length string))
+         (precision (argument-precision directive)))
+    (if (>= (length string) 0)
+        (if precision
+            (subseq string 0 (if (> precision 0)
+                                 (min precision length)
+                                 0))
+            string))))
 
 (defun print-arg (directive destination)
   "Print value of DIRECTIVE to DESTINATION stream.

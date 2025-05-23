@@ -85,7 +85,9 @@
 
     (unless (slot-boundp directive 'precision)
       (setf (slot-value directive 'precision)
-            (if (find last "efg") 6 0)))
+            (cond ((find last "efg") 6)
+                  ((find last "sS") nil)
+                  (t 0))))
     
     (setf (consume-argument-p directive) t)
 

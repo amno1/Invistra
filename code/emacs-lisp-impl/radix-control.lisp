@@ -10,7 +10,6 @@
   (let ((value (directive-argument parameter))
         (radix (parameter-radix parameter)))
     (declare (type fixnum radix))
-    ;; (cl:format t "radix: ~a~%" radix)
     (when (minusp value)
       (setf (slot-value parameter 'sign-char) #\-))
     (setf value (if (floatp value) (abs (floor value)) (abs value)))
@@ -19,19 +18,19 @@
            (prefix (argument-prefix parameter))
            (print-case (parameter-case parameter))
            (precision (argument-precision parameter)))
-      (declare (type fixnum value radix))
-      (let ((digit-count (quaviver.math:count-digits radix value)))
-        (declare (type fixnum radix value))
+      (let* ((digit-count (quaviver.math:count-digits radix value)))
+        (declare (type fixnum digit-count radix value))
         (with-output-to-string (stream)
           (cond
             ((= radix 8)
              (when (<= precision digit-count)
                (princ prefix stream)))
-            (t (princ prefix stream)))
+            (t
+             (princ prefix stream)))
           (when (> precision digit-count)
             (loop repeat (- precision digit-count)
                   do (write-char #\0 stream)))
-          (princ value stream)          
+          (princ value stream)
           (case print-case
             (:upper
              (return-from argument-to-string
