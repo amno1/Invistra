@@ -65,7 +65,9 @@
 (def-test-group |o-directive|
     (deftests invistra-emacs-lisp-extrinsic:format
       "%#o"        0      => "0"
-      "%#.o"       0      => "0000"
+      "%#o"        1      => "01"
+      "%#.o"       0      => "0"
+      "%#.o"       1      => "01"
       "%#4.4o"     0      => "0000"
       "%o %o"      1  2   => "1 2"
       "%o %o"     0.1 1.9 => "0 1"
